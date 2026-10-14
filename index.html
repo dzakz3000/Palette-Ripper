@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Palette Ripper — Pull a palette out of any image</title>
+  <meta name="description" content="Palette Ripper extracts dominant colors from an image, lets you sample exact pixels, and previews your palette in a live UI. Everything runs in your browser.">
+  <meta name="color-scheme" content="light dark">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23171614'/%3E%3Crect x='6' y='7' width='5' height='18' rx='1.5' fill='%23f3f2ee'/%3E%3Crect x='13.5' y='11' width='5' height='14' rx='1.5' fill='%23a8a59d'/%3E%3Crect x='21' y='15' width='5' height='10' rx='1.5' fill='%23ff5a3c'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#workspace">Skip to workspace</a>
+
+  <!-- ============ Top navigation ============ -->
+  <header class="topbar">
+    <div class="topbar__inner">
+      <a class="brand" href="./" aria-label="Palette Ripper">
+        <svg class="brand__mark" viewBox="0 0 28 28" aria-hidden="true" focusable="false">
+          <rect x="2" y="4" width="6" height="20" rx="1.6" fill="currentColor"/>
+          <rect x="11" y="9" width="6" height="15" rx="1.6" fill="currentColor" opacity=".5"/>
+          <rect x="20" y="14" width="6" height="10" rx="1.6" fill="var(--accent)"/>
+        </svg>
+        <span class="brand__name">Palette Ripper</span>
+      </a>
+      <p class="topbar__tagline">Pull a working palette out of any picture.</p>
+      <button id="themeToggle" class="btn btn--icon" type="button" aria-label="Switch to dark theme" aria-pressed="false" title="Toggle theme">
+        <svg class="icon icon--moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></svg>
+        <svg class="icon icon--sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="main" class="page">
+    <section class="intro">
+      <p class="eyebrow">Image <span aria-hidden="true">→</span> Palette</p>
+      <h1 class="intro__title">Rip a working palette out of any image.</h1>
+      <p class="intro__lede">Drop in a picture. Palette Ripper reads its pixels, finds the colors that matter, lets you pick exact points, and shows how they hold up in a real interface. Nothing leaves your browser.</p>
+    </section>
+
+    <!-- ============ Workspace: image + picked color ============ -->
+    <div class="workspace" id="workspace">
+
+      <section class="panel viewer-panel" aria-labelledby="viewerTitle">
+        <header class="panel__head">
+          <span class="panel__index" aria-hidden="true">01</span>
+          <h2 class="panel__title" id="viewerTitle">Image</h2>
+          <div class="panel__actions">
+            <button id="replaceBtn" class="btn btn--small" type="button" hidden>Replace</button>
+            <button id="removeBtn" class="btn btn--small btn--ghost" type="button" hidden>Remove</button>
+          </div>
+        </header>
+
+        <div id="errorBanner" class="banner" role="alert" hidden>
+          <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>
+          <span id="errorText"></span>
+          <button id="errorDismiss" class="banner__close" type="button" aria-label="Dismiss message">
+            <svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+
+        <div class="viewer" id="viewer">
+          <!-- Empty state / drop target -->
+          <button type="button" class="dropzone" id="dropzone" aria-describedby="dropzoneHint">
+            <span class="dropzone__icon" aria-hidden="true">
+              <svg class="icon" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M3 17l5-4.5 4 3.5 3-2.5 6 5"/></svg>
+            </span>
+            <span class="dropzone__title">Drop an image here</span>
+            <span class="dropzone__sub">or <u>browse your files</u></span>
+            <span class="dropzone__hint" id="dropzoneHint">PNG, JPEG, WebP, GIF, BMP or AVIF · up to 25&nbsp;MB · processed on your device · you can also paste an image</span>
+          </button>
+          <input id="fileInput" class="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp,image/gif,image/bmp,image/avif" aria-label="Choose an image file" tabindex="-1">
+
+          <!-- Interactive image stage -->
+          <div class="stage" id="stage" hidden>
+            <canvas id="imageCanvas" class="stage__canvas" tabindex="0"
+              aria-label="Uploaded image. Click or tap to sample a color. With the keyboard, use the arrow keys to move the sample point; hold Shift to move faster."></canvas>
+            <div id="marker" class="marker" aria-hidden="true" hidden></div>
+          </div>
+
+          <div id="processing" class="processing" role="status" aria-live="polite" hidden>
+            <span class="spinner" aria-hidden="true"></span>
+            <span id="processingText">Reading pixels…</span>
+          </div>
+        </div>
+
+        <footer class="viewer__meta" id="viewerMeta" hidden>
+          <span class="viewer__file" id="metaFile"></span>
+          <span class="viewer__dims" id="metaDims"></span>
+          <span class="hover-chip" id="hoverChip" hidden>
+            <i class="hover-chip__dot" id="hoverDot" aria-hidden="true"></i>
+            <span id="hoverHex"></span>
+          </span>
+        </footer>
+      </section>
+
+      <aside class="panel sample-panel" aria-labelledby="sampleTitle">
+        <header class="panel__head">
+          <span class="panel__index" aria-hidden="true">02</span>
+          <h2 class="panel__title" id="sampleTitle">Picked color</h2>
+        </header>
+
+        <div id="sampleEmpty" class="empty">
+          <div class="empty__glyph" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 24 24" focusable="false"><path d="M4 20l1-4 9.5-9.5 3 3L8 19l-4 1z"/><path d="M14.5 6.5l1.8-1.8a2 2 0 0 1 2.8 0l.2.2a2 2 0 0 1 0 2.8l-1.8 1.8"/></svg>
+          </div>
+          <p id="sampleEmptyText">Upload an image to start picking colors.</p>
+        </div>
+
+        <div id="sampleBody" class="sample" hidden>
+          <div id="sampleSwatch" class="sample__swatch checker" role="img" aria-label="Preview of the sampled color"></div>
+          <dl class="values">
+            <div class="values__row">
+              <dt>HEX</dt>
+              <dd id="sampleHex">—</dd>
+              <button id="copySampleHex" class="btn btn--small" type="button">Copy</button>
+            </div>
+            <div class="values__row">
+              <dt>RGB</dt>
+              <dd id="sampleRgb">—</dd>
+              <button id="copySampleRgb" class="btn btn--small" type="button">Copy</button>
+            </div>
+            <div class="values__row">
+              <dt>HSL</dt>
+              <dd id="sampleHsl">—</dd>
+              <button id="copySampleHsl" class="btn btn--small" type="button">Copy</button>
+            </div>
+          </dl>
+          <p class="sample__meta" id="sampleMeta"></p>
+          <p class="sample__notice" id="sampleNotice" hidden></p>
+          <button id="addSampleBtn" class="btn btn--primary btn--block" type="button">Add to palette</button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- ============ Palette ============ -->
+    <section class="panel palette-panel" id="palette" aria-labelledby="paletteTitle">
+      <header class="panel__head">
+        <span class="panel__index" aria-hidden="true">03</span>
+        <h2 class="panel__title" id="paletteTitle">Palette</h2>
+        <div class="panel__actions">
+          <button id="resetPaletteBtn" class="btn btn--small btn--ghost" type="button" disabled>Reset palette</button>
+        </div>
+      </header>
+
+      <div class="palette-controls">
+        <div class="field">
+          <label class="field__label" for="colorCount">Colors to extract</label>
+          <div class="range">
+            <input id="colorCount" type="range" min="2" max="12" step="1" value="6" disabled aria-describedby="paletteStatus">
+            <output id="colorCountOutput" for="colorCount">6</output>
+          </div>
+        </div>
+        <div class="export" role="group" aria-label="Export palette">
+          <span class="export__label">Export</span>
+          <button id="exportTxt" class="btn btn--small" type="button" disabled title="Download HEX codes as a text file">.txt</button>
+          <button id="exportJson" class="btn btn--small" type="button" disabled title="Download full color data as JSON">.json</button>
+          <button id="exportCss" class="btn btn--small" type="button" disabled title="Download CSS custom properties">.css</button>
+        </div>
+      </div>
+
+      <p class="palette-status" id="paletteStatus" role="status" aria-live="polite"></p>
+      <div id="paletteStrip" class="strip" aria-hidden="true" hidden></div>
+
+      <div id="paletteEmpty" class="empty empty--wide">
+        <div class="empty__glyph" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" focusable="false"><path d="M12 3a9 9 0 1 0 0 18c1.7 0 2.4-1 2.4-2.1 0-1.4-1.3-1.6-1.3-3 0-1 .8-1.9 2-1.9H17a4 4 0 0 0 4-4C21 6.2 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg>
+        </div>
+        <p id="paletteEmptyText">Your palette will appear here once you upload an image.</p>
+      </div>
+
+      <ul id="paletteList" class="swatches" aria-label="Color palette" hidden></ul>
+    </section>
+
+    <!-- ============ Live preview ============ -->
+    <section class="panel preview-panel" id="preview" aria-labelledby="previewTitle">
+      <header class="panel__head">
+        <span class="panel__index" aria-hidden="true">04</span>
+        <h2 class="panel__title" id="previewTitle">Live preview</h2>
+      </header>
+
+      <div id="previewEmpty" class="empty empty--wide">
+        <div class="empty__glyph" aria-hidden="true">
+          <svg class="icon" viewBox="0 0 24 24" focusable="false"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 14h8"/></svg>
+        </div>
+        <p>Colors from your palette can be assigned to interface roles here. Upload an image to begin.</p>
+      </div>
+
+      <div id="previewWorkspace" class="preview" hidden>
+        <div class="preview__controls">
+          <h3 class="subhead">Assign colors</h3>
+          <p class="preview__help">1. Choose a color. 2. Assign it to a role.</p>
+
+          <div id="previewPicker" class="picker" role="group" aria-label="Choose a palette color"></div>
+          <p class="preview__selected">Selected <strong id="selectedLabel">—</strong></p>
+
+          <div class="roles" id="roleButtons" role="group" aria-label="Assign the selected color to a role">
+            <button type="button" class="role-btn" data-role="background"><span class="role-btn__chip"></span><span class="role-btn__name">Background</span><span class="role-btn__hex">—</span></button>
+            <button type="button" class="role-btn" data-role="surface"><span class="role-btn__chip"></span><span class="role-btn__name">Surface</span><span class="role-btn__hex">—</span></button>
+            <button type="button" class="role-btn" data-role="primary"><span class="role-btn__chip"></span><span class="role-btn__name">Primary</span><span class="role-btn__hex">—</span></button>
+            <button type="button" class="role-btn" data-role="secondary"><span class="role-btn__chip"></span><span class="role-btn__name">Secondary</span><span class="role-btn__hex">—</span></button>
+            <button type="button" class="role-btn" data-role="accent"><span class="role-btn__chip"></span><span class="role-btn__name">Accent</span><span class="role-btn__hex">—</span></button>
+            <button type="button" class="role-btn" data-role="text"><span class="role-btn__chip"></span><span class="role-btn__name">Text</span><span class="role-btn__hex">—</span></button>
+          </div>
+          <button id="autoAssignBtn" class="btn btn--small btn--block" type="button">Auto-assign roles</button>
+
+          <h3 class="subhead subhead--spaced">Contrast <span class="subhead__note">WCAG 2.1</span></h3>
+          <ul id="contrastList" class="contrast" aria-live="polite"></ul>
+        </div>
+
+        <div class="preview__stage-wrap">
+          <div class="tabs" id="previewTabs" role="tablist" aria-label="Preview mode">
+            <button class="tab" role="tab" type="button" id="tab-website" data-mode="website" aria-selected="true" aria-controls="view-website">Website UI</button>
+            <button class="tab" role="tab" type="button" id="tab-cards" data-mode="cards" aria-selected="false" aria-controls="view-cards" tabindex="-1">Color cards</button>
+            <button class="tab" role="tab" type="button" id="tab-type" data-mode="type" aria-selected="false" aria-controls="view-type" tabindex="-1">Typography</button>
+          </div>
+
+          <div id="previewStage" class="pv">
+            <!-- Mode 1: website UI -->
+            <div class="pv__view" id="view-website" data-view="website" role="tabpanel" aria-labelledby="tab-website">
+              <div class="site">
+                <div class="site__nav">
+                  <span class="site__brand"><span class="site__brand-dot"></span>Northlight</span>
+                  <span class="site__links"><span>Work</span><span>Journal</span><span>About</span></span>
+                  <span class="pv-btn pv-btn--primary pv-btn--sm">Get in touch</span>
+                </div>
+                <div class="site__hero">
+                  <span class="pv-eyebrow">Spring collection · 2026</span>
+                  <h3 class="site__title">Color that carries the story.</h3>
+                  <p class="site__lede">Northlight is a small studio designing identities, interfaces and print for people who care about the details.</p>
+                  <div class="site__cta">
+                    <span class="pv-btn pv-btn--primary">Explore the work</span>
+                    <span class="pv-btn pv-btn--secondary">Read the journal</span>
+                  </div>
+                </div>
+                <div class="site__grid">
+                  <article class="pv-card">
+                    <span class="pv-tag">Identity</span>
+                    <h4 class="pv-card__title">Harbor &amp; Pine</h4>
+                    <p class="pv-card__text">A coastal outfitter’s rebrand, built around a single confident accent.</p>
+                    <div class="pv-meter" style="--w:72%"><span></span></div>
+                    <span class="pv-link">View case study →</span>
+                  </article>
+                  <article class="pv-card">
+                    <span class="pv-tag">Interface</span>
+                    <h4 class="pv-card__title">Field Notes app</h4>
+                    <p class="pv-card__text">Quiet surfaces and clear actions for a journaling tool used outdoors.</p>
+                    <div class="pv-meter" style="--w:48%"><span></span></div>
+                    <span class="pv-link">View case study →</span>
+                  </article>
+                </div>
+              </div>
+            </div>
+
+            <!-- Mode 2: color cards (filled in by script.js) -->
+            <div class="pv__view" id="view-cards" data-view="cards" role="tabpanel" aria-labelledby="tab-cards" hidden>
+              <div class="cards-view">
+                <div id="cardsGrid" class="cards"></div>
+                <div id="cardsStrip" class="cards-strip" aria-hidden="true"></div>
+              </div>
+            </div>
+
+            <!-- Mode 3: typography specimen -->
+            <div class="pv__view" id="view-type" data-view="type" role="tabpanel" aria-labelledby="tab-type" hidden>
+              <div class="type">
+                <div class="type__lead">
+                  <span class="type__glyph" aria-hidden="true">Aa</span>
+                  <div>
+                    <span class="pv-eyebrow">Typography specimen</span>
+                    <h3 class="type__display">Quiet colors, loud ideas.</h3>
+                    <p class="type__sub">A palette earns its keep when the words on top of it stay easy to read.</p>
+                  </div>
+                </div>
+                <div class="type__cols">
+                  <article class="pv-card">
+                    <h4 class="type__h2">Heading level two</h4>
+                    <p class="pv-card__text">Body copy set in the text color on a surface. Line length, leading and contrast do most of the work; color supplies the mood and the hierarchy.</p>
+                    <blockquote class="type__quote">Good color is mostly good restraint.</blockquote>
+                    <ul class="type__list">
+                      <li>Primary for the main action</li>
+                      <li>Secondary for supporting actions</li>
+                      <li>Accent for small moments of emphasis</li>
+                    </ul>
+                  </article>
+                  <article class="pv-card pv-card--primary">
+                    <span class="pv-tag pv-tag--inverse">Inverted</span>
+                    <h4 class="type__h2">Set on the primary color</h4>
+                    <p class="pv-card__text">Label colors are chosen automatically so text stays readable on whichever color you assign.</p>
+                    <span class="pv-btn pv-btn--accent">Accent button</span>
+                  </article>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Palette Ripper runs entirely in your browser. Images are never uploaded.</p>
+  </footer>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <div id="liveRegion" class="visually-hidden" aria-live="polite" aria-atomic="true"></div>
+</body>
+</html>
